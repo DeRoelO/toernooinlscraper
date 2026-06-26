@@ -142,7 +142,10 @@ def scrape_homepage(session, username, password, domain="mijnknltb.toernooi.nl")
         
     return parsed_matches
 
-def generate_ical(matches, owner_name):
+def generate_ical(matches, owner_name, player_config_names=None):
+    if not player_config_names:
+        player_config_names = [owner_name]
+        
     cal = Calendar()
     cal.add('prodid', '-//Tennis Calendar Scraper//NL')
     cal.add('version', '2.0')
@@ -150,19 +153,77 @@ def generate_ical(matches, owner_name):
     cal.add('x-wr-timezone', 'Europe/Amsterdam')
     
     for match in matches:
-        team1_str = " / ".join(match["team1"])
-        team2_str = " / ".join(match["team2"])
+        # Determine sport (Tennis or Padel)
+        sport = "Padel" if "padel" in match["tournament"].lower() else "Tennis"
+        
+        # Determine which of our players are in this match
+        playing_names = []
+        for c_name in player_config_names:
+            if any(c_name.lower() in p.lower() for p in match["team1"] + match["team2"]):
+                playing_names.append(c_name)
+                
+        if playing_names:
+            naam_part = " & ".join(playing_names)
+        else:
+            naam_part = owner_name
+            
+        summary = f"{sport} - {naam_part}"
+        
+        # Determine court (baan) if available in location
+        location = match.get("location", "")
+        court = None
+        clean_location = location
+        if location:
+            court_match = re.search(r'\b(baan\s+\w+|court\s+\w+)\b', location, re.IGNORECASE)
+            if court_match:
+                court_text = court_match.group(1)
+                # Capitalize court text (e.g. "Baan 1")
+                court = court_text.capitalize()
+                # Clean up location
+                clean_location = location.replace(court_text, "")
+                clean_location = re.sub(r'^\s*[\s,\-\(\)]+\s*', '', clean_location)
+                clean_location = re.sub(r'\s*[\s,\-\(\)]+\s*$', '', clean_location)
+                clean_location = clean_location.strip()
+                
+        # Format teams for description
+        # Our team is the team that contains at least one player matching a configured name
+        t1_has_our = any(any(c_name.lower() in p.lower() for c_name in player_config_names) for p in match["team1"])
+        t2_has_our = any(any(c_name.lower() in p.lower() for c_name in player_config_names) for p in match["team2"])
+        
+        if t2_has_our and not t1_has_our:
+            our_team = match["team2"]
+            opp_team = match["team1"]
+        else:
+            our_team = match["team1"]
+            opp_team = match["team2"]
+            
+        def format_team(team_players):
+            formatted_players = []
+            for p in team_players:
+                matched = False
+                for c_name in player_config_names:
+                    if c_name.lower() in p.lower():
+                        formatted_players.append(c_name)
+                        matched = True
+                        break
+                if not matched:
+                    formatted_players.append(p)
+            return " & ".join(formatted_players)
+            
+        our_team_str = format_team(our_team)
+        opp_team_str = format_team(opp_team)
+        
+        desc_lines = [f"{our_team_str} - {opp_team_str}"]
+        if court:
+            desc_lines.append(court)
+        desc_lines.append(f"Toernooi: {match['tournament']}")
+        
+        description = "\n".join(desc_lines)
         
         event = Event()
-        
-        # Determine summary
-        summary = f"Tennis: {team1_str} vs {team2_str}"
         event.add('summary', summary)
-        
-        # Description
-        description = f"Toernooi: {match['tournament']}\nLocatie: {match['location']}"
         event.add('description', description)
-        event.add('location', match['location'])
+        event.add('location', clean_location)
         
         # Parse start datetime or date
         dt_val, is_all_day = parse_dutch_datetime(match["date_str"])
@@ -180,7 +241,7 @@ def generate_ical(matches, owner_name):
             continue
             
         # Create a stable, unique UID
-        uid_raw = f"{summary}_{match['date_str']}_{match['location']}".encode('utf-8')
+        uid_raw = f"{summary}_{match['date_str']}_{clean_location}".encode('utf-8')
         uid = hashlib.md5(uid_raw).hexdigest() + "@tennis-calendar-scraper"
         event.add('uid', uid)
         event.add('dtstamp', datetime.datetime.now(pytz.utc))
@@ -194,6 +255,9 @@ def run_scraper(config_path, output_dir):
         config = json.load(f)
         
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Get all configured player names to format ICS output correctly
+    player_config_names = [acc.get("name", "").strip() for acc in config.get("accounts", []) if acc.get("name")]
     
     # Store matches grouped by owner name
     player_matches = {}
@@ -249,7 +313,7 @@ def run_scraper(config_path, output_dir):
                 seen.add(repr_str)
                 unique_player_matches.append(m)
                 
-        ical_data = generate_ical(unique_player_matches, name)
+        ical_data = generate_ical(unique_player_matches, name, player_config_names)
         ical_path = os.path.join(output_dir, f"{name.lower()}.ics")
         with open(ical_path, 'wb') as f_out:
             f_out.write(ical_data)
@@ -270,7 +334,7 @@ def run_scraper(config_path, output_dir):
                 seen_matches.add(repr_str)
                 unique_matches.append(m)
                 
-        combined_ical = generate_ical(unique_matches, "Combined")
+        combined_ical = generate_ical(unique_matches, "Combined", player_config_names)
         combined_path = os.path.join(output_dir, "tennis.ics")
         with open(combined_path, 'wb') as f_out:
             f_out.write(combined_ical)
