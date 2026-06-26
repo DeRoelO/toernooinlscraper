@@ -491,13 +491,44 @@ def render_config_page():
     <script>
         function copyLink(filename) {{
             const link = window.location.protocol + "//" + window.location.host + "/" + filename;
-            navigator.clipboard.writeText(link).then(function() {{
+            
+            function showNotification() {{
                 const notif = document.getElementById('notification');
                 notif.style.display = 'block';
                 setTimeout(function() {{
                     notif.style.display = 'none';
                 }}, 3000);
-            }});
+            }}
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(link).then(showNotification).catch(function(err) {{
+                    fallbackCopy(link);
+                }});
+            }} else {{
+                fallbackCopy(link);
+            }}
+
+            function fallbackCopy(text) {{
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.position = "fixed";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {{
+                    const successful = document.execCommand('copy');
+                    if (successful) {{
+                        showNotification();
+                    }} else {{
+                        alert("Kopiëren mislukt. Kopieer de link handmatig: " + text);
+                    }}
+                }} catch (err) {{
+                    alert("Kopiëren mislukt. Kopieer de link handmatig: " + text);
+                }}
+                document.body.removeChild(textArea);
+            }}
         }}
     </script>
 </body>
