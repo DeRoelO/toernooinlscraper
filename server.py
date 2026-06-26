@@ -546,17 +546,17 @@ class CalendarHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         params = urllib.parse.parse_qs(post_data)
         
         # Clean parameter values (parse_qs wraps them in list)
-        data = {{k: v[0] for k, v in params.items()}}
+        data = {k: v[0] for k, v in params.items()}
         
         config = get_config()
         
         if path == '/config/add_account':
-            new_acc = {{
+            new_acc = {
                 "name": data.get("name"),
                 "username": data.get("username"),
                 "password": data.get("password"),
                 "domain": data.get("domain", "mijnknltb.toernooi.nl")
-            }}
+            }
             config.setdefault("accounts", []).append(new_acc)
             save_config(config)
             reload_event.set() # Trigger immediate reload & scrape
