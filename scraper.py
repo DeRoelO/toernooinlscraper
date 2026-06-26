@@ -194,10 +194,14 @@ def run_scraper(config_path, output_dir):
         config = json.load(f)
         
     os.makedirs(output_dir, exist_ok=True)
-    all_matches = []
+    
+    # Store matches grouped by owner name
+    player_matches = {}
     
     for acc in config.get("accounts", []):
         name = acc.get("name")
+        if not name:
+            continue
         username = acc.get("username")
         password = acc.get("password")
         
@@ -210,30 +214,46 @@ def run_scraper(config_path, output_dir):
         try:
             domain = acc.get("domain", "mijnknltb.toernooi.nl")
             matches = scrape_homepage(session, username, password, domain)
-            logging.info(f"Found {len(matches)} matches for {name}.")
+            logging.info(f"Found {len(matches)} matches for {name} on {domain}.")
             
             if matches:
                 # Filter out Bye matches
                 valid_matches = [m for m in matches if not any("bye" in p.lower() for p in m["team1"] + m["team2"])]
                 
-                # Save player specific .ics
-                ical_data = generate_ical(valid_matches, name)
-                ical_path = os.path.join(output_dir, f"{name.lower()}.ics")
-                with open(ical_path, 'wb') as f_out:
-                    f_out.write(ical_data)
-                logging.info(f"Saved {name}.ics with {len(valid_matches)} matches.")
-                
-                all_matches.extend(valid_matches)
+                key = name.strip()
+                player_matches.setdefault(key, []).extend(valid_matches)
         except Exception as e:
-            logging.error(f"Error scraping for {name}: {str(e)}", exc_info=True)
+            logging.error(f"Error scraping for {name} on {domain}: {str(e)}", exc_info=True)
             
+    # Now, process and write files for each unique player name
+    all_matches = []
+    
+    for name, matches in player_matches.items():
+        # Deduplicate matches for this specific player
+        unique_player_matches = []
+        seen = set()
+        for m in matches:
+            t1 = tuple(sorted(m['team1']))
+            t2 = tuple(sorted(m['team2']))
+            teams_key = tuple(sorted([t1, t2]))
+            repr_str = f"{teams_key}_{m['date_str']}"
+            if repr_str not in seen:
+                seen.add(repr_str)
+                unique_player_matches.append(m)
+                
+        ical_data = generate_ical(unique_player_matches, name)
+        ical_path = os.path.join(output_dir, f"{name.lower()}.ics")
+        with open(ical_path, 'wb') as f_out:
+            f_out.write(ical_data)
+        logging.info(f"Saved {name.lower()}.ics with {len(unique_player_matches)} matches.")
+        
+        all_matches.extend(unique_player_matches)
+        
     if all_matches:
         # Generate combined calendar
-        # Filter duplicates (if Roel and Ella play together in mixed doubles)
         unique_matches = []
         seen_matches = set()
         for m in all_matches:
-            # Create a stable representation regardless of team order or player order within teams
             t1 = tuple(sorted(m['team1']))
             t2 = tuple(sorted(m['team2']))
             teams_key = tuple(sorted([t1, t2]))

@@ -453,8 +453,8 @@ def render_config_page():
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="username">Gebruikersnaam / Bondsnummer</label>
-                        <input type="text" id="username" name="username" required placeholder="Bondsnummer of e-mail">
+                        <label for="username">Gebruikersnaam</label>
+                        <input type="text" id="username" name="username" required placeholder="Gebruikersnaam">
                     </div>
                     <div class="form-group">
                         <label for="password">Wachtwoord</label>
