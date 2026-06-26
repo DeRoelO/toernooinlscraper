@@ -81,7 +81,7 @@ def render_config_page():
         <tr>
             <td><strong>{acc.get('name')}</strong></td>
             <td><code>{acc.get('username')}</code></td>
-            <td>{acc.get('domain')}</td>
+            <td>{acc.get('domain', 'beide')}</td>
             <td><span class="mask-password">••••••••</span></td>
             <td style="text-align: right;">
                 <form action="/config/delete_account" method="post" style="display:inline;">
@@ -447,9 +447,9 @@ def render_config_page():
                     <div class="form-group">
                         <label for="domain">Toernooi.nl Domein</label>
                         <select id="domain" name="domain" required>
-                            <option value="mijnknltb.toernooi.nl" selected>mijnknltb.toernooi.nl (KNLTB Tennis/Padel)</option>
-                            <option value="www.toernooi.nl">www.toernooi.nl (Standaard)</option>
-                            <option value="knltb.toernooi.nl">knltb.toernooi.nl</option>
+                            <option value="beide" selected>Beide (mijnknltb.toernooi.nl & toernooi.nl)</option>
+                            <option value="mijnknltb.toernooi.nl">mijnknltb.toernooi.nl (KNLTB)</option>
+                            <option value="toernooi.nl">toernooi.nl (Standaard)</option>
                         </select>
                     </div>
                     <div class="form-group">

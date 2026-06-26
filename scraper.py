@@ -211,19 +211,27 @@ def run_scraper(config_path, output_dir):
             'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
         })
         
-        try:
-            domain = acc.get("domain", "mijnknltb.toernooi.nl")
-            matches = scrape_homepage(session, username, password, domain)
-            logging.info(f"Found {len(matches)} matches for {name} on {domain}.")
+        domain_choice = acc.get("domain", "beide")
+        if domain_choice == "beide":
+            domains_to_scrape = ["mijnknltb.toernooi.nl", "www.toernooi.nl"]
+        elif domain_choice == "toernooi.nl":
+            domains_to_scrape = ["www.toernooi.nl"]
+        else:
+            domains_to_scrape = [domain_choice]
             
-            if matches:
-                # Filter out Bye matches
-                valid_matches = [m for m in matches if not any("bye" in p.lower() for p in m["team1"] + m["team2"])]
+        for domain in domains_to_scrape:
+            try:
+                matches = scrape_homepage(session, username, password, domain)
+                logging.info(f"Found {len(matches)} matches for {name} on {domain}.")
                 
-                key = name.strip()
-                player_matches.setdefault(key, []).extend(valid_matches)
-        except Exception as e:
-            logging.error(f"Error scraping for {name} on {domain}: {str(e)}", exc_info=True)
+                if matches:
+                    # Filter out Bye matches
+                    valid_matches = [m for m in matches if not any("bye" in p.lower() for p in m["team1"] + m["team2"])]
+                    
+                    key = name.strip()
+                    player_matches.setdefault(key, []).extend(valid_matches)
+            except Exception as e:
+                logging.error(f"Error scraping for {name} on {domain}: {str(e)}", exc_info=True)
             
     # Now, process and write files for each unique player name
     all_matches = []
