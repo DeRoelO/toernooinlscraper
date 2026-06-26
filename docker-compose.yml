@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  tennis-calendar:
+    build: .
+    container_name: tennis-calendar-scraper
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.json:/app/config.json
